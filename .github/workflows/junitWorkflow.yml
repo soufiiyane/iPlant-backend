@@ -80,46 +80,54 @@ jobs:
         with:
           paths: "target/surefire-reports/TEST-*.xml"
 
-      - name: 📈 Publish Coverage Summary
+      - name: 📈 Create Coverage Badge
+        uses: schneegans/dynamic-badges-action@v1.6.0
+        with:
+          auth: \${{ secrets.GIST_SECRET }}
+          gistID: YOUR_GIST_ID # Create a gist and put its ID here
+          filename: coverage.json
+          label: Coverage
+          message: \${{ steps.jacoco.outputs.coverage }}%
+          color: \${{ steps.jacoco.outputs.coverage >= 80 && 'green' || steps.jacoco.outputs.coverage >= 70 && 'yellow' || 'red' }}
+          namedLogo: junit5
+
+      - name: 📋 Create Beautiful Report
         if: always()
         uses: actions/github-script@v6
         with:
           script: |
             const fs = require('fs');
-            const summary = require('./code-coverage-results.json');
+            const coverageReport = fs.readFileSync('code-coverage-results.md', 'utf8');
+            const testResults = fs.readFileSync('test-summary.md', 'utf8');
             
-            let details = `## 📊 Test Coverage Report\n\n`;
-            details += `### Overview\n`;
-            details += `- **Lines**: \${summary.line_coverage}%\n`;
-            details += `- **Branches**: \${summary.branch_coverage}%\n`;
-            details += `- **Methods**: \${summary.method_coverage}%\n\n`;
+            const report = `# 📊 Test & Coverage Report
             
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: details
-            });
+            ## 🧪 Test Results
+            \${testResults}
+            
+            ## 📈 Coverage Analysis
+            \${coverageReport}
+            
+            ## 🎯 Coverage Targets
+            - ✅ Line Coverage: 80%
+            - ✅ Branch Coverage: 70%
+            - ✅ Method Coverage: 75%
+            
+            [View detailed coverage report](\${process.env.GITHUB_SERVER_URL}/\${process.env.GITHUB_REPOSITORY}/actions/runs/\${process.env.GITHUB_RUN_ID})
+            `;
+            
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+            }
 
-      - name: 📋 Create Status Check
-        if: always()
-        uses: LouisBrunner/checks-action@v1.6.0
-        with:
-          token: \${{ secrets.GITHUB_TOKEN }}
-          name: Test Results
-          conclusion: \${{ job.status }}
-          output: |
-            {"title":"🧪 Test Results Summary","summary":"### Test Results\n- ✅ Passed: \${{ steps.test-reporter.outputs.passed }}\n- ❌ Failed: \${{ steps.test-reporter.outputs.failed }}\n- ⏩ Skipped: \${{ steps.test-reporter.outputs.skipped }}\n\n### Coverage\n\${{ steps.coverage.outputs.report }}"}
-
-      - name: 📊 Generate HTML Coverage Report
-        if: always()
+      - name: 📊 Upload HTML Report
         uses: actions/upload-artifact@v3
         with:
-          name: coverage-report-html
-          path: target/site/jacoco/
-
-      - name: 📈 Generate Trend Graph
-        uses: matchai/generate-coverage-graph@master
-        with:
-          coverage-file: target/site/jacoco/jacoco.xml
-          min-coverage: 80
+          name: 📈 Coverage HTML Report
+          path: target/site/jacoco
+          if-no-files-found: error
