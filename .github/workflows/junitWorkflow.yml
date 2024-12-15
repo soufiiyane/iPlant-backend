@@ -1,4 +1,4 @@
-name: 🧪 Tests & Coverage Analysis
+name: Tests & Coverage
 
 on:
   push:
@@ -8,126 +8,49 @@ on:
 
 jobs:
   test:
-    name: Run Tests & Analysis
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v3
 
-      - name: 🛠️ Setup JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: 🧪 Run Tests
+      - name: Run Tests
         run: mvn clean test
 
-      - name: 📊 Generate Coverage Report
+      - name: Generate Coverage Report
         run: mvn jacoco:report
 
-      - name: 📝 Publish Test Results
+      - name: Publish Test Results
         uses: dorny/test-reporter@v1
         if: success() || failure()
         with:
-          name: 🧪 JUnit Test Results
+          name: Test Results
           path: target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: true
 
-      - name: 📈 Generate Detailed Test Report
-        uses: ScaCap/action-surefire-report@v1
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v3
         with:
-          github_token: \${{ secrets.GITHUB_TOKEN }}
-          report_paths: 'target/surefire-reports/TEST-*.xml'
+          name: coverage-report
+          path: target/site/jacoco/
 
-      - name: 📊 Coverage Report
+      - name: Coverage Report
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: target/site/jacoco/jacoco.xml
           badge: true
           format: 'markdown'
           output: 'both'
-          indicators: true
 
-      - name: ⭐ Generate JaCoCo Badge
-        uses: cicirello/jacoco-badge-generator@v2
-        with:
-          generate-branches-badge: true
-          generate-coverage-badge: true
-
-      - name: 💾 Upload Coverage Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: 📊 Coverage Report
-          path: |
-            target/site/jacoco/
-            .github/badges
-
-      - name: 💬 Add Coverage PR Comment
+      - name: Add Coverage PR Comment
         uses: marocchino/sticky-pull-request-comment@v2
         if: github.event_name == 'pull_request'
         with:
           recreate: true
           path: code-coverage-results.md
-
-      - name: 📊 Generate Test Summary
-        if: always()
-        uses: test-summary/action@v2
-        with:
-          paths: "target/surefire-reports/TEST-*.xml"
-
-      - name: 📈 Create Coverage Badge
-        uses: schneegans/dynamic-badges-action@v1.6.0
-        with:
-          auth: \${{ secrets.GIST_SECRET }}
-          gistID: YOUR_GIST_ID # Create a gist and put its ID here
-          filename: coverage.json
-          label: Coverage
-          message: \${{ steps.jacoco.outputs.coverage }}%
-          color: \${{ steps.jacoco.outputs.coverage >= 80 && 'green' || steps.jacoco.outputs.coverage >= 70 && 'yellow' || 'red' }}
-          namedLogo: junit5
-
-      - name: 📋 Create Beautiful Report
-        if: always()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const coverageReport = fs.readFileSync('code-coverage-results.md', 'utf8');
-            const testResults = fs.readFileSync('test-summary.md', 'utf8');
-            
-            const report = `# 📊 Test & Coverage Report
-            
-            ## 🧪 Test Results
-            \${testResults}
-            
-            ## 📈 Coverage Analysis
-            \${coverageReport}
-            
-            ## 🎯 Coverage Targets
-            - ✅ Line Coverage: 80%
-            - ✅ Branch Coverage: 70%
-            - ✅ Method Coverage: 75%
-            
-            [View detailed coverage report](\${process.env.GITHUB_SERVER_URL}/\${process.env.GITHUB_REPOSITORY}/actions/runs/\${process.env.GITHUB_RUN_ID})
-            `;
-            
-            if (context.payload.pull_request) {
-              await github.rest.issues.createComment({
-                issue_number: context.payload.pull_request.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: report
-              });
-            }
-
-      - name: 📊 Upload HTML Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: 📈 Coverage HTML Report
-          path: target/site/jacoco
-          if-no-files-found: error
