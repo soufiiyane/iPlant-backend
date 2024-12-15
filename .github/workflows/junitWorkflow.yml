@@ -1,4 +1,4 @@
-name: Tests & Coverage
+name: 🧪 Tests & Coverage Analysis
 
 on:
   push:
@@ -8,49 +8,118 @@ on:
 
 jobs:
   test:
+    name: Run Tests & Analysis
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: 🛠️ Setup JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Run Tests
+      - name: 🧪 Run Tests
         run: mvn clean test
 
-      - name: Generate Coverage Report
+      - name: 📊 Generate Coverage Report
         run: mvn jacoco:report
 
-      - name: Publish Test Results
+      - name: 📝 Publish Test Results
         uses: dorny/test-reporter@v1
         if: success() || failure()
         with:
-          name: Test Results
+          name: 🧪 JUnit Test Results
           path: target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: true
 
-      - name: Upload Coverage Report
-        uses: actions/upload-artifact@v3
+      - name: 📈 Generate Detailed Test Report
+        uses: ScaCap/action-surefire-report@v1
         with:
-          name: coverage-report
-          path: target/site/jacoco/
+          github_token: \${{ secrets.GITHUB_TOKEN }}
+          report_paths: 'target/surefire-reports/TEST-*.xml'
 
-      - name: Coverage Report
+      - name: 📊 Coverage Report
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: target/site/jacoco/jacoco.xml
           badge: true
           format: 'markdown'
           output: 'both'
+          indicators: true
 
-      - name: Add Coverage PR Comment
+      - name: ⭐ Generate JaCoCo Badge
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          generate-branches-badge: true
+          generate-coverage-badge: true
+
+      - name: 💾 Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: 📊 Coverage Report
+          path: |
+            target/site/jacoco/
+            .github/badges
+
+      - name: 💬 Add Coverage PR Comment
         uses: marocchino/sticky-pull-request-comment@v2
         if: github.event_name == 'pull_request'
         with:
           recreate: true
           path: code-coverage-results.md
+
+      - name: 📊 Generate Test Summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: "target/surefire-reports/TEST-*.xml"
+
+      - name: 📈 Publish Coverage Summary
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = require('./code-coverage-results.json');
+            
+            let details = `## 📊 Test Coverage Report\n\n`;
+            details += `### Overview\n`;
+            details += `- **Lines**: \${summary.line_coverage}%\n`;
+            details += `- **Branches**: \${summary.branch_coverage}%\n`;
+            details += `- **Methods**: \${summary.method_coverage}%\n\n`;
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: details
+            });
+
+      - name: 📋 Create Status Check
+        if: always()
+        uses: LouisBrunner/checks-action@v1.6.0
+        with:
+          token: \${{ secrets.GITHUB_TOKEN }}
+          name: Test Results
+          conclusion: \${{ job.status }}
+          output: |
+            {"title":"🧪 Test Results Summary","summary":"### Test Results\n- ✅ Passed: \${{ steps.test-reporter.outputs.passed }}\n- ❌ Failed: \${{ steps.test-reporter.outputs.failed }}\n- ⏩ Skipped: \${{ steps.test-reporter.outputs.skipped }}\n\n### Coverage\n\${{ steps.coverage.outputs.report }}"}
+
+      - name: 📊 Generate HTML Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-html
+          path: target/site/jacoco/
+
+      - name: 📈 Generate Trend Graph
+        uses: matchai/generate-coverage-graph@master
+        with:
+          coverage-file: target/site/jacoco/jacoco.xml
+          min-coverage: 80
