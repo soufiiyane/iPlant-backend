@@ -22,6 +22,8 @@ target/
 .sts4-cache
 
 htmlReport
+.smarttomcat
+target
 
 ### NetBeans ###
 /nbproject/private/
