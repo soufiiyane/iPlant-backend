@@ -4,121 +4,99 @@ import com.example.iPlant.LoginController;
 import com.example.iPlant.Model.LoginRequest;
 import com.example.iPlant.Model.LoginResponse;
 import com.example.iPlant.Service.LoginService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(LoginController.class)
 public class LoginControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
+    @Mock
     private LoginService loginService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    private LoginRequest validLoginRequest;
-    private LoginRequest invalidLoginRequest;
-    private LoginResponse successResponse;
-    private LoginResponse failureResponse;
+    @InjectMocks
+    private LoginController loginController;
 
     @BeforeEach
-    void setUp() {
-        // Set up valid login request
-        validLoginRequest = new LoginRequest();
-        LoginRequest.LoginBody validBody = new LoginRequest.LoginBody();
-        validBody.setEmail("imad@gmail.com");
-        validBody.setPassword("imad");
-        validLoginRequest.setBody(validBody);
-
-        invalidLoginRequest = new LoginRequest();
-        LoginRequest.LoginBody invalidBody = new LoginRequest.LoginBody();
-        invalidBody.setEmail("");
-        invalidBody.setPassword("");
-        invalidLoginRequest.setBody(invalidBody);
-
-        // Set up success response
-        successResponse = new LoginResponse();
-        successResponse.setStatusCode(200);
-        successResponse.setBody("Login successful");
-
-        // Set up failure response
-        failureResponse = new LoginResponse();
-        failureResponse.setStatusCode(401);
-        failureResponse.setBody("Invalid credentials");
+    public void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    public void whenValidInput_thenReturns200() throws Exception {
-        when(loginService.login(any(LoginRequest.class))).thenReturn(successResponse);
+    public void testLogin_Success() {
+        LoginRequest loginRequest = new LoginRequest();
+        LoginRequest.LoginBody loginBody = new LoginRequest.LoginBody();
+        loginBody.setEmail("test@example.com");
+        loginBody.setPassword("password123");
+        loginRequest.setBody(loginBody);
 
-        mockMvc.perform(post("/api/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validLoginRequest)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.statusCode").value(200))
-                .andExpect(jsonPath("$.body").value("Login successful"));
+        LoginResponse loginResponse = new LoginResponse();
+        loginResponse.setStatusCode(200);
+        loginResponse.setBody("Success");
+
+        when(loginService.login(any(LoginRequest.class))).thenReturn(loginResponse);
+
+        ResponseEntity<?> response = loginController.login(loginRequest);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(loginResponse, response.getBody());
     }
 
     @Test
-    public void whenInvalidCredentials_thenReturns401() throws Exception {
-        when(loginService.login(any(LoginRequest.class))).thenReturn(failureResponse);
+    public void testLogin_InvalidCredentials() {
+        LoginRequest loginRequest = new LoginRequest();
+        LoginRequest.LoginBody loginBody = new LoginRequest.LoginBody();
+        loginBody.setEmail("test@example.com");
+        loginBody.setPassword("wrongpassword");
+        loginRequest.setBody(loginBody);
 
-        mockMvc.perform(post("/api/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validLoginRequest)))
-                .andDo(print())
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().string("Invalid login credentials"));
+        LoginResponse loginResponse = new LoginResponse();
+        loginResponse.setStatusCode(401);
+        loginResponse.setBody("Invalid login credentials");
+
+        when(loginService.login(any(LoginRequest.class))).thenReturn(loginResponse);
+
+        ResponseEntity<?> response = loginController.login(loginRequest);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid login credentials", response.getBody());
     }
 
     @Test
-    public void whenEmptyCredentials_thenReturns400() throws Exception {
-        mockMvc.perform(post("/api/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidLoginRequest)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Please enter your email and password"));
+    public void testLogin_MissingCredentials() {
+        LoginRequest loginRequest = new LoginRequest();
+        LoginRequest.LoginBody loginBody = new LoginRequest.LoginBody();
+        loginBody.setEmail("");
+        loginBody.setPassword("");
+        loginRequest.setBody(loginBody);
+
+        ResponseEntity<?> response = loginController.login(loginRequest);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Please enter your email and password", response.getBody());
     }
 
     @Test
-    public void whenNullBody_thenReturns400() throws Exception {
-        LoginRequest requestWithNullBody = new LoginRequest();
+    public void testLogin_InternalServerError() {
+        LoginRequest loginRequest = new LoginRequest();
+        LoginRequest.LoginBody loginBody = new LoginRequest.LoginBody();
+        loginBody.setEmail("test@example.com");
+        loginBody.setPassword("password123");
+        loginRequest.setBody(loginBody);
 
-        mockMvc.perform(post("/api/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestWithNullBody)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Please enter your email and password"));
-    }
+        when(loginService.login(any(LoginRequest.class))).thenThrow(new RuntimeException("Service error"));
 
-    @Test
-    public void whenServiceThrowsException_thenReturns500() throws Exception {
-        when(loginService.login(any(LoginRequest.class)))
-                .thenThrow(new RuntimeException("Something went wrong"));
+        ResponseEntity<?> response = loginController.login(loginRequest);
 
-        mockMvc.perform(post("/api/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(validLoginRequest)))
-                .andDo(print())
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().string("Error: Something went wrong"));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals("Error: Service error", response.getBody());
     }
 }

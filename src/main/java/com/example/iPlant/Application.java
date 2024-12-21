@@ -1,4 +1,4 @@
-package com.example.iPlant;  // Adjust to match your package structure
+package com.example.iPlant;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
