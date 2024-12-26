@@ -6,7 +6,7 @@
   <artifactId>iPlant</artifactId>
   <packaging>war</packaging>
   <version>1.0-SNAPSHOT</version>
-  <name>iPlant Maven Webapp</name>
+  <name>iPlant-BackEnd</name>
   <url>http://maven.apache.org</url>
 
   <parent>
